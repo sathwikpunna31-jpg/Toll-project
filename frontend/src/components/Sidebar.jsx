@@ -17,6 +17,7 @@ function Sidebar() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const showAI = import.meta.env.VITE_PROJECT_STAGE === '2';
+  const isReviewOne = import.meta.env.VITE_REVIEW_PHASE === '1_1';
 
   const menuItems = [
     {
@@ -30,24 +31,28 @@ function Sidebar() {
       path: '/vehicles',
       icon: Car,
       roles: ['customer', 'admin'],
+      badge: isReviewOne ? 'Review 1' : null,
     },
     {
       name: 'Toll Plazas',
       path: '/plazas',
       icon: MapPin,
       roles: ['admin'], // Admin CRUD, customer view
+      badge: isReviewOne ? 'Review 1' : null,
     },
     {
       name: 'Toll Calculator',
       path: '/calculator',
       icon: Calculator,
       roles: ['admin', 'customer'],
+      badge: isReviewOne ? 'Review 2' : null,
     },
     {
       name: 'Simulate Toll Gating',
       path: '/payment',
       icon: CreditCard,
       roles: ['customer', 'admin'],
+      badge: isReviewOne ? 'Review 2' : null,
     },
     ...(showAI
       ? [
@@ -56,6 +61,7 @@ function Sidebar() {
             path: '/ai-gating',
             icon: Cpu,
             roles: ['admin', 'customer'],
+            badge: isReviewOne ? 'Phase 2' : null,
           },
         ]
       : []),
@@ -64,12 +70,14 @@ function Sidebar() {
       path: '/transactions',
       icon: History,
       roles: ['admin', 'customer'],
+      badge: isReviewOne ? 'Review 2' : null,
     },
     {
       name: 'Reports & Export',
       path: '/reports',
       icon: FileText,
       roles: ['admin', 'customer'],
+      badge: isReviewOne ? 'Review 2' : null,
     },
     {
       name: 'My Profile',
@@ -95,15 +103,26 @@ function Sidebar() {
               key={item.name}
               to={item.path}
               className={({ isActive }) =>
-                `flex items-center space-x-3 px-3 py-3 rounded-xl text-sm font-medium transition-all ${
+                `flex items-center justify-between px-3 py-3 rounded-xl text-sm font-medium transition-all ${
                   isActive
                     ? 'bg-sky-500/10 text-sky-400 border-l-2 border-sky-500'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                 }`
               }
             >
-              <Icon className="w-5 h-5" />
-              <span>{item.name}</span>
+              <div className="flex items-center space-x-3">
+                <Icon className="w-5 h-5 flex-shrink-0" />
+                <span>{item.name}</span>
+              </div>
+              {item.badge && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                  item.badge === 'Review 1' 
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                    : 'bg-slate-800 text-slate-500 border border-slate-700'
+                }`}>
+                  {item.badge}
+                </span>
+              )}
             </NavLink>
           );
         })}

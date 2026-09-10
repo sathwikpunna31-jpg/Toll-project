@@ -1,0 +1,27 @@
+# Node modules
+node_modules/
+dist/
+build/
+
+# Python Virtual Environments & Cache
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+env/
+*.pt
+
+# Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Environment variables
+# (Note: Keep .env.example tracked, but ignore real .env)
+# .env
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
