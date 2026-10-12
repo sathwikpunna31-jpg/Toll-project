@@ -306,17 +306,48 @@ function AiGating() {
 
                 {aiResult.vehicleDetails ? (
                   <div className="space-y-3 pt-2">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                      Vehicle Credentials
-                    </h4>
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                        Vehicle Credentials
+                      </h4>
+                      {aiResult.isFraud ? (
+                        <span className="px-2 py-0.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-extrabold uppercase rounded-full animate-pulse">
+                          Fraud Alert
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold uppercase rounded-full">
+                          Verified Match
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Fraud Alert Notification Banner */}
+                    {aiResult.isFraud && (
+                      <div className="p-3 bg-rose-950/50 border border-rose-500/40 rounded-xl text-rose-300 text-xs flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold">SUSPECTED PLATE CLONING!</p>
+                          <p className="text-[11px] text-rose-400/90 mt-0.5">
+                            Visual shape is <strong>{aiResult.visualVehicleClass}</strong>, but plate is registered to <strong>{aiResult.vehicleDetails.vehicleType}</strong>. Gate locked down.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="bg-slate-950/60 rounded-xl p-4 border border-slate-850 text-xs space-y-2.5">
                       <div className="flex justify-between">
                         <span className="text-slate-500">Model:</span>
                         <span className="text-slate-200 font-semibold">{aiResult.vehicleDetails.vehicleModel}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Category:</span>
+                        <span className="text-slate-500">Registered Type:</span>
                         <span className="text-slate-200 font-semibold">{aiResult.vehicleDetails.vehicleType}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">AI Visual Classifier:</span>
+                        <span className={`font-semibold ${aiResult.isFraud ? 'text-rose-400 font-bold' : 'text-sky-400'}`}>
+                          {aiResult.visualVehicleClass || 'Car'}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-500">Owner Name:</span>

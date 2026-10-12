@@ -14,6 +14,7 @@ import Transactions from './pages/Transactions';
 import Reports from './pages/Reports';
 import Profile from './pages/Profile';
 import AiGating from './pages/AiGating';
+import RouteOptimizer from './pages/RouteOptimizer';
 import UnderDevelopment from './components/UnderDevelopment';
 
 function App() {
@@ -100,8 +101,9 @@ function App() {
               } 
             />
 
-            {/* AI Smart Gating (Phase 2) */}
+            {/* Phase 2: AI Smart Gating & Highway Route Optimizer */}
             <Route path="ai-gating" element={<AiGating />} />
+            <Route path="route-optimizer" element={<RouteOptimizer />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

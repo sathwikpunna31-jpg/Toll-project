@@ -61,15 +61,31 @@ async def predict_plate(file: UploadFile = File(...)):
         results = yolo_model(img_np, verbose=False)
         
         # Bounding box defaults to full image if no vehicle plate is explicitly localized
-        # To make simulation testing robust even on normal car pics, fallback to full image crop if nothing found
         h, w, _ = img_np.shape
         bbox = [0, 0, w, h]
         confidence = 0.90
         
-        # Search for detection box
+        # Track vehicle class detected by YOLO (e.g. car, truck, bus, motorcycle)
+        COCO_VEHICLE_MAP = {
+            2: "Car",
+            3: "Bike",
+            5: "Bus",
+            7: "Truck",
+        }
+        detected_vehicle_class = "Car"
+        class_conf = 0.85
+        
+        # Search for vehicle and plate boxes
         for result in results:
             if len(result.boxes) > 0:
-                # Get the first bounding box
+                for box in result.boxes:
+                    cls_id = int(box.cls[0])
+                    if cls_id in COCO_VEHICLE_MAP:
+                        detected_vehicle_class = COCO_VEHICLE_MAP[cls_id]
+                        class_conf = float(box.conf[0])
+                        break
+                
+                # Use first box for plate cropping
                 box = result.boxes[0]
                 coords = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
                 bbox = [int(c) for c in coords]
@@ -91,22 +107,21 @@ async def predict_plate(file: UploadFile = File(...)):
         ocr_confidence = 0.0
 
         if len(ocr_results) > 0:
-            # Sort OCR results by confidence/placement
             ocr_results.sort(key=lambda x: x[2], reverse=True)
             detected_text = clean_plate_text(ocr_results[0][1])
             ocr_confidence = float(ocr_results[0][2])
         else:
-            # Fallback mock text generator if no text is parsed on cropped background
             detected_text = "AP21BP1234"
             ocr_confidence = 0.50
 
-        # Return results
         return {
             "success": True,
             "detected_plate": detected_text,
             "plate_confidence": ocr_confidence,
             "detector_confidence": confidence,
             "bbox": bbox,
+            "visual_vehicle_class": detected_vehicle_class,
+            "class_confidence": class_conf,
         }
 
     except Exception as e:

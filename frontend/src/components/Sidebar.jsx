@@ -11,6 +11,7 @@ import {
   FileText,
   User as UserIcon,
   Cpu,
+  Navigation,
 } from 'lucide-react';
 
 function Sidebar() {
@@ -60,6 +61,13 @@ function Sidebar() {
             name: 'AI Smart Gating',
             path: '/ai-gating',
             icon: Cpu,
+            roles: ['admin', 'customer'],
+            badge: isReviewOne ? 'Phase 2' : null,
+          },
+          {
+            name: 'Route & Toll Optimizer',
+            path: '/route-optimizer',
+            icon: Navigation,
             roles: ['admin', 'customer'],
             badge: isReviewOne ? 'Phase 2' : null,
           },

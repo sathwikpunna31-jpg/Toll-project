@@ -29,7 +29,7 @@ const processDetection = async (req, res) => {
       },
     });
 
-    const { detected_plate, plate_confidence, bbox } = aiResponse.data;
+    const { detected_plate, plate_confidence, bbox, visual_vehicle_class } = aiResponse.data;
     const cleanPlate = detected_plate.toUpperCase();
 
     // 2. Query vehicle in MongoDB
@@ -37,6 +37,17 @@ const processDetection = async (req, res) => {
 
     let status = 'Allowed';
     let reason = '';
+    let isFraud = false;
+
+    // Check Dual-Verification: Does the detected visual shape match the database vehicleType?
+    const normalizeType = (type) => {
+      if (!type) return 'Car';
+      const t = type.toLowerCase();
+      if (t.includes('truck')) return 'Truck';
+      if (t.includes('bus')) return 'Bus';
+      if (t.includes('bike') || t.includes('motorcycle') || t.includes('two')) return 'Bike';
+      return 'Car';
+    };
 
     if (!vehicle) {
       status = 'Blocked';
@@ -50,6 +61,11 @@ const processDetection = async (req, res) => {
     } else if (vehicle.vehicleType === 'Emergency') {
       status = 'Exempt';
       reason = 'Emergency vehicle toll exemption';
+    } else if (visual_vehicle_class && normalizeType(vehicle.vehicleType) !== normalizeType(visual_vehicle_class)) {
+      // DUAL VERIFICATION FRAUD DETECTED!
+      status = 'Blocked';
+      isFraud = true;
+      reason = `FRAUD ALERT: Class Mismatch! Registered: ${vehicle.vehicleType} | Detected: ${visual_vehicle_class}`;
     }
 
     // 3. Log detection history
@@ -65,6 +81,8 @@ const processDetection = async (req, res) => {
     res.status(201).json({
       success: true,
       detection,
+      isFraud,
+      visualVehicleClass: visual_vehicle_class,
       vehicleDetails: vehicle
         ? {
             id: vehicle._id,
