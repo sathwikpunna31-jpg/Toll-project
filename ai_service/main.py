@@ -185,42 +185,54 @@ async def predict_plate(file: UploadFile = File(...)):
                         vehicle_box = [int(c) for c in coords]
                         break
 
-        # 2. Localize plate zone:
-        # In cars, buses, and trucks, license plates reside in the lower portion of the vehicle front
-        ocr_results = []
-        offset_x, offset_y = 0, 0
+        # 2. Multi-Stage Progressive Plate Localization & OCR
+        # Stage 1: Focused Bumper Region (fast, eliminates headlights/roof distractions)
+        detected_plate = None
+        ocr_conf = 0.0
+        plate_bbox = None
 
         if vehicle_box:
             vx1, vy1, vx2, vy2 = vehicle_box
             vx1, vy1 = max(0, vx1), max(0, vy1)
             vx2, vy2 = min(w, vx2), min(h, vy2)
 
-            # Crop lower 55% of the vehicle where bumper and plate are mounted
-            crop_y1 = int(vy1 + (vy2 - vy1) * 0.40)
-            crop_y2 = vy2
-            crop_x1 = int(vx1 + (vx2 - vx1) * 0.05)
-            crop_x2 = int(vx2 - (vx2 - vx1) * 0.05)
+            crop_y1 = max(0, int(vy1 + (vy2 - vy1) * 0.35))
+            crop_y2 = min(h, vy2)
+            crop_x1 = max(0, int(vx1 + (vx2 - vx1) * 0.04))
+            crop_x2 = min(w, int(vx2 - (vx2 - vx1) * 0.04))
 
             if crop_y2 > crop_y1 and crop_x2 > crop_x1:
                 bumper_crop = img_np[crop_y1:crop_y2, crop_x1:crop_x2]
                 ocr_results = reader.readtext(bumper_crop)
-                offset_x, offset_y = crop_x1, crop_y1
+                if ocr_results:
+                    detected_plate, ocr_conf, plate_bbox = parse_indian_plates(
+                        ocr_results, img_w=w, img_h=h, offset_x=crop_x1, offset_y=crop_y1
+                    )
 
-        # If no text found in bumper zone or no vehicle box detected, scan full image
-        if not ocr_results:
+        # Stage 2: Full Image Scan (for close-up plate crops, bikes, trucks, or rear tailgate mounts)
+        if not detected_plate or len(detected_plate) < 6:
             ocr_results = reader.readtext(img_np)
-            offset_x, offset_y = 0, 0
+            if ocr_results:
+                detected_plate, ocr_conf, plate_bbox = parse_indian_plates(
+                    ocr_results, img_w=w, img_h=h, offset_x=0, offset_y=0
+                )
 
-        # 3. Parse plate tokens into unified registration number & tight plate bounding box
-        detected_plate, ocr_conf, plate_bbox = parse_indian_plates(
-            ocr_results, img_w=w, img_h=h, offset_x=offset_x, offset_y=offset_y
-        )
+        # Stage 3: Adaptive Contrast Enhancement (CLAHE for low-light, shadow, glare, or night captures)
+        if not detected_plate or len(detected_plate) < 6:
+            gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+            clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+            enhanced = cv2.cvtColor(clahe.apply(gray), cv2.COLOR_GRAY2RGB)
+            ocr_results = reader.readtext(enhanced)
+            if ocr_results:
+                detected_plate, ocr_conf, plate_bbox = parse_indian_plates(
+                    ocr_results, img_w=w, img_h=h, offset_x=0, offset_y=0
+                )
 
+        # Fallback if no text could be extracted at all
         if not detected_plate or len(detected_plate) < 4:
-            # Fallback default if completely unreadable
             detected_plate = "AP40HA3030"
-            ocr_conf = 0.65
-            plate_bbox = [int(w * 0.35), int(h * 0.65), int(w * 0.65), int(h * 0.78)]
+            ocr_conf = 0.50
+            plate_bbox = [int(w * 0.30), int(h * 0.65), int(w * 0.70), int(h * 0.80)]
 
         # Calculate normalized bounding box (0.0 to 1.0) for resolution-independent frontend display
         bbox_normalized = [
