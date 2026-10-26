@@ -13,7 +13,9 @@ const processDetection = async (req, res) => {
   }
 
   const imagePath = `/uploads/${req.file.filename}`;
-  const pythonUrl = process.env.PYTHON_AI_SERVICE_URL || 'http://localhost:8000';
+  // Use 127.0.0.1 explicitly to prevent Node.js v18+ IPv6 (::1) ECONNREFUSED mismatch
+  let pythonUrl = process.env.PYTHON_AI_SERVICE_URL || 'http://127.0.0.1:8000';
+  pythonUrl = pythonUrl.replace('localhost', '127.0.0.1');
 
   try {
     // 1. Forward file stream to Python AI Service
