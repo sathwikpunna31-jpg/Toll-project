@@ -1,4 +1,5 @@
 import io
+import os
 import re
 import numpy as np
 from fastapi import FastAPI, File, UploadFile, HTTPException
@@ -9,7 +10,7 @@ from ultralytics import YOLO
 import easyocr
 import torch
 
-app = FastAPI(title="TollWise AI Engine", version="2.0.0")
+app = FastAPI(title="TollWise AI Engine", version="2.1.0")
 
 # Enable CORS for cross-origin frontend/backend requests
 app.add_middleware(
@@ -27,16 +28,16 @@ def new_torch_load(*args, **kwargs):
     return _orig_torch_load(*args, **kwargs)
 torch.load = new_torch_load
 
-# Global models initialization
-print("Loading YOLOv8 vehicle classifier model...")
-yolo_model = YOLO("yolov8n.pt") 
+# Global models initialization with absolute path resolution
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+yolo_path = os.path.join(BASE_DIR, "yolov8n.pt")
+print(f"Loading YOLOv8 vehicle classifier model from {yolo_path}...")
+yolo_model = YOLO(yolo_path if os.path.exists(yolo_path) else "yolov8n.pt") 
 
 print("Loading EasyOCR english reader...")
 reader = easyocr.Reader(['en'], gpu=False)
 
 # Indian Registration Plate Regex:
-# Standard: State (2 letters) + District (1-2 digits) + Series (0-3 letters) + Number (1-4 digits)
-# Example: AP40HA3030, KL49L2222, TS09UB4521, DL1CAB1234
 PLATE_REGEX = r'^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{1,4}$'
 BH_REGEX = r'^[0-9]{2}BH[0-9]{4}[A-Z]{1,2}$'
 
@@ -46,28 +47,32 @@ def clean_token(text: str) -> str:
 def postprocess_indian_plate(text: str) -> str:
     """Corrects common OCR digit/letter confusions in Indian number plates."""
     text = clean_token(text)
-    if len(text) < 8 or len(text) > 11:
+    if len(text) < 7 or len(text) > 11:
         return text
 
-    digit_fix = {'O': '0', 'D': '0', 'Q': '0', 'I': '1', 'L': '1', 'Z': '2', 'S': '5', 'B': '8'}
-    letter_fix = {'0': 'O', '1': 'I', '2': 'Z', '5': 'S', '8': 'B'}
+    digit_fix = {'O': '0', 'D': '0', 'Q': '0', 'I': '1', 'L': '1', 'Z': '7', 'S': '5', 'B': '8'}
+    letter_fix = {'0': 'O', '1': 'I', '2': 'Z', '5': 'S', '8': 'B', '7': 'Z'}
 
     # State (first 2 chars): Must be letters
     c0 = letter_fix.get(text[0], text[0])
     c1 = letter_fix.get(text[1], text[1])
 
-    # District (next 2 chars): Must be digits
+    # District (char 2): Must be digit
     d0 = digit_fix.get(text[2], text[2])
-    d1 = digit_fix.get(text[3], text[3])
 
-    # Split series and 4-digit number
-    rest = text[4:]
-    if len(rest) >= 4:
-        num_part = rest[-4:]
-        series_part = rest[:-4]
-        series_fixed = ''.join(letter_fix.get(c, c) for c in series_part)
-        num_fixed = ''.join(digit_fix.get(c, c) for c in num_part)
-        return f"{c0}{c1}{d0}{d1}{series_fixed}{num_fixed}"
+    if len(text) == 10:
+        # Standard format: e.g. TS07JK8559, AP40HA3030, KA22MB6663
+        d1 = digit_fix.get(text[3], text[3])
+        s0 = letter_fix.get(text[4], text[4])
+        s1 = letter_fix.get(text[5], text[5])
+        num = ''.join(digit_fix.get(c, c) for c in text[6:])
+        return f"{c0}{c1}{d0}{d1}{s0}{s1}{num}"
+    elif len(text) == 9:
+        # Single-letter series: e.g. KL49L2222
+        d1 = digit_fix.get(text[3], text[3])
+        s0 = letter_fix.get(text[4], text[4])
+        num = ''.join(digit_fix.get(c, c) for c in text[5:])
+        return f"{c0}{c1}{d0}{d1}{s0}{num}"
 
     return text
 
@@ -96,7 +101,7 @@ def parse_indian_plates(ocr_boxes, img_w, img_h, offset_x=0, offset_y=0):
     if not cleaned_items:
         return None, 0.0, None
 
-    # 1. Check if any single token already matches Indian plate pattern (e.g. AP40HA3030)
+    # 1. Check if any single token already matches Indian plate pattern (e.g. KA22MB6663)
     for it in cleaned_items:
         t = postprocess_indian_plate(it['text'])
         if (re.match(PLATE_REGEX, t) or re.match(BH_REGEX, t)) and len(t) >= 7:
@@ -110,10 +115,10 @@ def parse_indian_plates(ocr_boxes, img_w, img_h, offset_x=0, offset_y=0):
             ]
             return t, it['conf'], bbox
 
-    # 2. Sort tokens top-to-bottom, left-to-right to assemble split plate components
+    # 2. Sort tokens top-to-bottom, left-to-right to assemble split plate components (e.g. ['TS 07', 'JK 8559'])
     cleaned_items.sort(key=lambda it: (round(it['cy'] / 35), it['cx']))
 
-    # 3. Test contiguous combinations of tokens (e.g. ['AP', '40', 'HA', '3030'])
+    # 3. Test contiguous combinations of tokens
     n = len(cleaned_items)
     for length in range(n, 1, -1):
         for start in range(n - length + 1):
@@ -148,7 +153,7 @@ def parse_indian_plates(ocr_boxes, img_w, img_h, offset_x=0, offset_y=0):
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "models_loaded": True, "engine": "TollWise AI v2.0"}
+    return {"status": "healthy", "models_loaded": True, "engine": "TollWise AI v2.1"}
 
 @app.post("/predict")
 async def predict_plate(file: UploadFile = File(...)):
@@ -186,11 +191,11 @@ async def predict_plate(file: UploadFile = File(...)):
                         break
 
         # 2. Multi-Stage Progressive Plate Localization & OCR
-        # Stage 1: Focused Bumper Region (fast, eliminates headlights/roof distractions)
         detected_plate = None
         ocr_conf = 0.0
         plate_bbox = None
 
+        # Stage 1: Focused Bumper Region with 2x Super-Resolution Upscaling
         if vehicle_box:
             vx1, vy1, vx2, vy2 = vehicle_box
             vx1, vy1 = max(0, vx1), max(0, vy1)
@@ -203,22 +208,43 @@ async def predict_plate(file: UploadFile = File(...)):
 
             if crop_y2 > crop_y1 and crop_x2 > crop_x1:
                 bumper_crop = img_np[crop_y1:crop_y2, crop_x1:crop_x2]
-                ocr_results = reader.readtext(bumper_crop)
-                if ocr_results:
+                
+                # 2x bicubic super-resolution scaling for sharp alphanumeric character edges
+                scale = 2.0
+                scaled_crop = cv2.resize(bumper_crop, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+                ocr_raw = reader.readtext(scaled_crop)
+                
+                if ocr_raw:
+                    scaled_results = []
+                    for poly, text, conf in ocr_raw:
+                        orig_poly = [[p[0] / scale, p[1] / scale] for p in poly]
+                        scaled_results.append((orig_poly, text, conf))
+                    
                     detected_plate, ocr_conf, plate_bbox = parse_indian_plates(
-                        ocr_results, img_w=w, img_h=h, offset_x=crop_x1, offset_y=crop_y1
+                        scaled_results, img_w=w, img_h=h, offset_x=crop_x1, offset_y=crop_y1
                     )
 
-        # Stage 2: Full Image Scan (for close-up plate crops, bikes, trucks, or rear tailgate mounts)
-        if not detected_plate or len(detected_plate) < 6:
-            ocr_results = reader.readtext(img_np)
-            if ocr_results:
+        # Stage 2: Full Image Scan (with 2x upscaling for close-ups, bikes, trucks, or rear plates)
+        if not detected_plate or len(detected_plate) < 7:
+            scale = 2.0 if max(w, h) < 1200 else 1.0
+            if scale > 1.0:
+                scaled_img = cv2.resize(img_np, (0, 0), fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+            else:
+                scaled_img = img_np
+
+            ocr_raw = reader.readtext(scaled_img)
+            if ocr_raw:
+                scaled_results = []
+                for poly, text, conf in ocr_raw:
+                    orig_poly = [[p[0] / scale, p[1] / scale] for p in poly]
+                    scaled_results.append((orig_poly, text, conf))
+
                 detected_plate, ocr_conf, plate_bbox = parse_indian_plates(
-                    ocr_results, img_w=w, img_h=h, offset_x=0, offset_y=0
+                    scaled_results, img_w=w, img_h=h, offset_x=0, offset_y=0
                 )
 
         # Stage 3: Adaptive Contrast Enhancement (CLAHE for low-light, shadow, glare, or night captures)
-        if not detected_plate or len(detected_plate) < 6:
+        if not detected_plate or len(detected_plate) < 7:
             gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
             clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
             enhanced = cv2.cvtColor(clahe.apply(gray), cv2.COLOR_GRAY2RGB)
