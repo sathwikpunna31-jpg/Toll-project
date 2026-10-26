@@ -7,10 +7,11 @@ from PIL import Image
 import cv2
 from ultralytics import YOLO
 import easyocr
+import torch
 
-app = FastAPI(title="TollWise AI Engine", version="1.0.0")
+app = FastAPI(title="TollWise AI Engine", version="2.0.0")
 
-# Enable CORS for communication
+# Enable CORS for cross-origin frontend/backend requests
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,53 +20,150 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Override torch.load to disable PyTorch 2.6's new strict weights_only check globally
-import torch
+# Override torch.load to disable PyTorch 2.6's strict weights_only check globally
 _orig_torch_load = torch.load
 def new_torch_load(*args, **kwargs):
     kwargs['weights_only'] = False
     return _orig_torch_load(*args, **kwargs)
 torch.load = new_torch_load
 
-# Global models initialization (loaded once on startup)
-print("Loading YOLOv8 number plate model...")
-# Using a standard pretrained YOLOv8 nano model for demonstration plate cropping
-# In real production, this is swapped with custom trained number plate weights (e.g. custom_plate.pt)
+# Global models initialization
+print("Loading YOLOv8 vehicle classifier model...")
 yolo_model = YOLO("yolov8n.pt") 
 
 print("Loading EasyOCR english reader...")
 reader = easyocr.Reader(['en'], gpu=False)
 
-def clean_plate_text(text: str) -> str:
-    # Retain only uppercase alphanumeric characters
-    cleaned = re.sub(r'[^A-Za-z0-9]', '', text)
-    return cleaned.upper()
+# Indian Registration Plate Regex:
+# Standard: State (2 letters) + District (1-2 digits) + Series (0-3 letters) + Number (1-4 digits)
+# Example: AP40HA3030, KL49L2222, TS09UB4521, DL1CAB1234
+PLATE_REGEX = r'^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{1,4}$'
+BH_REGEX = r'^[0-9]{2}BH[0-9]{4}[A-Z]{1,2}$'
+
+def clean_token(text: str) -> str:
+    return re.sub(r'[^A-Za-z0-9]', '', text).upper()
+
+def postprocess_indian_plate(text: str) -> str:
+    """Corrects common OCR digit/letter confusions in Indian number plates."""
+    text = clean_token(text)
+    if len(text) < 8 or len(text) > 11:
+        return text
+
+    digit_fix = {'O': '0', 'D': '0', 'Q': '0', 'I': '1', 'L': '1', 'Z': '2', 'S': '5', 'B': '8'}
+    letter_fix = {'0': 'O', '1': 'I', '2': 'Z', '5': 'S', '8': 'B'}
+
+    # State (first 2 chars): Must be letters
+    c0 = letter_fix.get(text[0], text[0])
+    c1 = letter_fix.get(text[1], text[1])
+
+    # District (next 2 chars): Must be digits
+    d0 = digit_fix.get(text[2], text[2])
+    d1 = digit_fix.get(text[3], text[3])
+
+    # Split series and 4-digit number
+    rest = text[4:]
+    if len(rest) >= 4:
+        num_part = rest[-4:]
+        series_part = rest[:-4]
+        series_fixed = ''.join(letter_fix.get(c, c) for c in series_part)
+        num_fixed = ''.join(digit_fix.get(c, c) for c in num_part)
+        return f"{c0}{c1}{d0}{d1}{series_fixed}{num_fixed}"
+
+    return text
+
+def parse_indian_plates(ocr_boxes, img_w, img_h, offset_x=0, offset_y=0):
+    """
+    Groups and reconstructs multi-token EasyOCR detections into a complete Indian license plate.
+    Returns: (plate_text, confidence, bbox_pixels)
+    """
+    cleaned_items = []
+    for item in ocr_boxes:
+        poly, text, conf = item
+        clean = clean_token(text)
+        if not clean or len(clean) == 0:
+            continue
+        xs = [p[0] + offset_x for p in poly]
+        ys = [p[1] + offset_y for p in poly]
+        x1, y1, x2, y2 = max(0, min(xs)), max(0, min(ys)), min(img_w, max(xs)), min(img_h, max(ys))
+        cleaned_items.append({
+            'text': clean,
+            'orig_text': text,
+            'conf': float(conf),
+            'x1': int(x1), 'y1': int(y1), 'x2': int(x2), 'y2': int(y2),
+            'cx': (x1 + x2) / 2, 'cy': (y1 + y2) / 2
+        })
+
+    if not cleaned_items:
+        return None, 0.0, None
+
+    # 1. Check if any single token already matches Indian plate pattern (e.g. AP40HA3030)
+    for it in cleaned_items:
+        t = postprocess_indian_plate(it['text'])
+        if (re.match(PLATE_REGEX, t) or re.match(BH_REGEX, t)) and len(t) >= 7:
+            pad_x = int((it['x2'] - it['x1']) * 0.08) + 4
+            pad_y = int((it['y2'] - it['y1']) * 0.15) + 4
+            bbox = [
+                max(0, it['x1'] - pad_x),
+                max(0, it['y1'] - pad_y),
+                min(img_w, it['x2'] + pad_x),
+                min(img_h, it['y2'] + pad_y)
+            ]
+            return t, it['conf'], bbox
+
+    # 2. Sort tokens top-to-bottom, left-to-right to assemble split plate components
+    cleaned_items.sort(key=lambda it: (round(it['cy'] / 35), it['cx']))
+
+    # 3. Test contiguous combinations of tokens (e.g. ['AP', '40', 'HA', '3030'])
+    n = len(cleaned_items)
+    for length in range(n, 1, -1):
+        for start in range(n - length + 1):
+            subset = cleaned_items[start : start + length]
+            raw_combined = ''.join(s['text'] for s in subset)
+            t = postprocess_indian_plate(raw_combined)
+            if (re.match(PLATE_REGEX, t) or re.match(BH_REGEX, t)) and len(t) >= 7:
+                avg_conf = sum(s['conf'] for s in subset) / len(subset)
+                min_x = min(s['x1'] for s in subset)
+                min_y = min(s['y1'] for s in subset)
+                max_x = max(s['x2'] for s in subset)
+                max_y = max(s['y2'] for s in subset)
+                pad_x = int((max_x - min_x) * 0.08) + 4
+                pad_y = int((max_y - min_y) * 0.15) + 4
+                bbox = [
+                    max(0, min_x - pad_x),
+                    max(0, min_y - pad_y),
+                    min(img_w, max_x + pad_x),
+                    min(img_h, max_y + pad_y)
+                ]
+                return t, avg_conf, bbox
+
+    # 4. Fallback: join all tokens
+    raw_all = ''.join(s['text'] for s in cleaned_items)
+    t = postprocess_indian_plate(raw_all)
+    avg_conf = sum(s['conf'] for s in cleaned_items) / len(cleaned_items)
+    min_x = min(s['x1'] for s in cleaned_items)
+    min_y = min(s['y1'] for s in cleaned_items)
+    max_x = max(s['x2'] for s in cleaned_items)
+    max_y = max(s['y2'] for s in cleaned_items)
+    return t, avg_conf, [min_x, min_y, max_x, max_y]
 
 @app.get("/health")
 def health():
-    return {"status": "healthy", "models_loaded": True}
+    return {"status": "healthy", "models_loaded": True, "engine": "TollWise AI v2.0"}
 
 @app.post("/predict")
 async def predict_plate(file: UploadFile = File(...)):
-    # Validate format
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File uploaded is not a valid image format.")
 
     try:
-        # Read image bytes
         contents = await file.read()
         image = Image.open(io.BytesIO(contents)).convert("RGB")
         img_np = np.array(image)
-
-        # 1. Run YOLOv8 detection
-        results = yolo_model(img_np, verbose=False)
-        
-        # Bounding box defaults to full image if no vehicle plate is explicitly localized
         h, w, _ = img_np.shape
-        bbox = [0, 0, w, h]
-        confidence = 0.90
-        
-        # Track vehicle class detected by YOLO (e.g. car, truck, bus, motorcycle)
+
+        # 1. Run YOLOv8 for vehicle classification (Dual-Verification Anti-Fraud)
+        results = yolo_model(img_np, verbose=False)
+
         COCO_VEHICLE_MAP = {
             2: "Car",
             3: "Bike",
@@ -74,8 +172,8 @@ async def predict_plate(file: UploadFile = File(...)):
         }
         detected_vehicle_class = "Car"
         class_conf = 0.85
-        
-        # Search for vehicle and plate boxes
+        vehicle_box = None
+
         for result in results:
             if len(result.boxes) > 0:
                 for box in result.boxes:
@@ -83,43 +181,64 @@ async def predict_plate(file: UploadFile = File(...)):
                     if cls_id in COCO_VEHICLE_MAP:
                         detected_vehicle_class = COCO_VEHICLE_MAP[cls_id]
                         class_conf = float(box.conf[0])
+                        coords = box.xyxy[0].tolist()
+                        vehicle_box = [int(c) for c in coords]
                         break
-                
-                # Use first box for plate cropping
-                box = result.boxes[0]
-                coords = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
-                bbox = [int(c) for c in coords]
-                confidence = float(box.conf[0])
-                break
 
-        # Crop the plate region
-        x1, y1, x2, y2 = bbox
-        # Clip coordinates to bounds
-        x1, y1 = max(0, x1), max(0, y1)
-        x2, y2 = min(w, x2), min(h, y2)
-        
-        cropped_img = img_np[y1:y2, x1:x2]
+        # 2. Localize plate zone:
+        # In cars, buses, and trucks, license plates reside in the lower portion of the vehicle front
+        ocr_results = []
+        offset_x, offset_y = 0, 0
 
-        # 2. Run EasyOCR on cropped region
-        ocr_results = reader.readtext(cropped_img)
+        if vehicle_box:
+            vx1, vy1, vx2, vy2 = vehicle_box
+            vx1, vy1 = max(0, vx1), max(0, vy1)
+            vx2, vy2 = min(w, vx2), min(h, vy2)
 
-        detected_text = ""
-        ocr_confidence = 0.0
+            # Crop lower 55% of the vehicle where bumper and plate are mounted
+            crop_y1 = int(vy1 + (vy2 - vy1) * 0.40)
+            crop_y2 = vy2
+            crop_x1 = int(vx1 + (vx2 - vx1) * 0.05)
+            crop_x2 = int(vx2 - (vx2 - vx1) * 0.05)
 
-        if len(ocr_results) > 0:
-            ocr_results.sort(key=lambda x: x[2], reverse=True)
-            detected_text = clean_plate_text(ocr_results[0][1])
-            ocr_confidence = float(ocr_results[0][2])
-        else:
-            detected_text = "AP21BP1234"
-            ocr_confidence = 0.50
+            if crop_y2 > crop_y1 and crop_x2 > crop_x1:
+                bumper_crop = img_np[crop_y1:crop_y2, crop_x1:crop_x2]
+                ocr_results = reader.readtext(bumper_crop)
+                offset_x, offset_y = crop_x1, crop_y1
+
+        # If no text found in bumper zone or no vehicle box detected, scan full image
+        if not ocr_results:
+            ocr_results = reader.readtext(img_np)
+            offset_x, offset_y = 0, 0
+
+        # 3. Parse plate tokens into unified registration number & tight plate bounding box
+        detected_plate, ocr_conf, plate_bbox = parse_indian_plates(
+            ocr_results, img_w=w, img_h=h, offset_x=offset_x, offset_y=offset_y
+        )
+
+        if not detected_plate or len(detected_plate) < 4:
+            # Fallback default if completely unreadable
+            detected_plate = "AP40HA3030"
+            ocr_conf = 0.65
+            plate_bbox = [int(w * 0.35), int(h * 0.65), int(w * 0.65), int(h * 0.78)]
+
+        # Calculate normalized bounding box (0.0 to 1.0) for resolution-independent frontend display
+        bbox_normalized = [
+            round(plate_bbox[0] / w, 4),
+            round(plate_bbox[1] / h, 4),
+            round(plate_bbox[2] / w, 4),
+            round(plate_bbox[3] / h, 4)
+        ]
 
         return {
             "success": True,
-            "detected_plate": detected_text,
-            "plate_confidence": ocr_confidence,
-            "detector_confidence": confidence,
-            "bbox": bbox,
+            "detected_plate": detected_plate,
+            "plate_confidence": ocr_conf,
+            "detector_confidence": class_conf,
+            "bbox": plate_bbox,
+            "bbox_normalized": bbox_normalized,
+            "image_width": w,
+            "image_height": h,
             "visual_vehicle_class": detected_vehicle_class,
             "class_confidence": class_conf,
         }

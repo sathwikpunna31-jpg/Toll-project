@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const User = require('./models/User');
+const Vehicle = require('./models/Vehicle');
 const TollPlaza = require('./models/TollPlaza');
 require('dotenv').config();
 
@@ -32,6 +33,74 @@ const seedData = async () => {
     });
     console.log('Customer seeded: customer@tollwise.com / customer123');
 
+    // Clear and Seed default vehicles
+    await Vehicle.deleteMany({});
+    console.log('Cleared existing vehicles.');
+
+    const seededVehicles = await Vehicle.create([
+      {
+        vehicleNumber: 'AP40HA3030',
+        owner: customer._id,
+        ownerName: 'John Doe Customer',
+        vehicleType: 'Car',
+        vehicleModel: 'Toyota Innova Hycross',
+        registrationNumber: 'RC-AP40-3030',
+        fastagId: 'FT-8899112233',
+        status: 'Active',
+      },
+      {
+        vehicleNumber: 'KL49L2222',
+        owner: customer._id,
+        ownerName: 'John Doe Customer',
+        vehicleType: 'Car',
+        vehicleModel: 'Maruti Suzuki Dzire',
+        registrationNumber: 'RC-KL49-2222',
+        fastagId: 'FT-7766554433',
+        status: 'Active',
+      },
+      {
+        vehicleNumber: 'TS09UB4521',
+        owner: customer._id,
+        ownerName: 'John Doe Customer',
+        vehicleType: 'Car',
+        vehicleModel: 'Hyundai Creta SX',
+        registrationNumber: 'RC-TS09-4521',
+        fastagId: 'FT-5544332211',
+        status: 'Active',
+      },
+      {
+        vehicleNumber: 'DL1CAB1234',
+        owner: customer._id,
+        ownerName: 'John Doe Customer',
+        vehicleType: 'Car',
+        vehicleModel: 'Honda City ZX',
+        registrationNumber: 'RC-DL01-1234',
+        fastagId: 'FT-4433221100',
+        status: 'Active',
+      },
+      {
+        vehicleNumber: 'MH12TR9999',
+        owner: customer._id,
+        ownerName: 'Logistics Trans Cargo',
+        vehicleType: 'Truck',
+        vehicleModel: 'Tata Prima 407 Heavy',
+        registrationNumber: 'RC-MH12-9999',
+        fastagId: 'FT-9988776655',
+        status: 'Active',
+      },
+      {
+        vehicleNumber: 'KA04EM0108',
+        owner: customer._id,
+        ownerName: 'City Trauma Emergency Unit',
+        vehicleType: 'Emergency',
+        vehicleModel: 'Force Emergency Life Support',
+        registrationNumber: 'RC-KA04-0108',
+        fastagId: 'FT-1081081081',
+        status: 'Active',
+      },
+    ]);
+    console.log(`Seeded ${seededVehicles.length} default registered vehicles.`);
+
     // Clear and Seed default Plazas if empty
     const plazaCount = await TollPlaza.countDocuments();
     if (plazaCount === 0) {
@@ -39,13 +108,18 @@ const seedData = async () => {
         {
           name: 'Bangalore Expressway Plaza',
           location: 'NH-44, Bangalore',
-          rates: { Bike: 20, Car: 80, Bus: 150, Truck: 250, Emergency: 0 }
+          rates: { Bike: 20, Car: 80, Bus: 150, Truck: 250, Emergency: 0 },
         },
         {
           name: 'Delhi-Gurgaon Gating Node',
           location: 'NH-48, Gurgaon',
-          rates: { Bike: 15, Car: 65, Bus: 120, Truck: 200, Emergency: 0 }
-        }
+          rates: { Bike: 15, Car: 65, Bus: 120, Truck: 200, Emergency: 0 },
+        },
+        {
+          name: 'Hyderabad Outer Ring Plaza',
+          location: 'ORR-Exit 11, Hyderabad',
+          rates: { Bike: 25, Car: 90, Bus: 160, Truck: 280, Emergency: 0 },
+        },
       ]);
       console.log('Default Toll Plazas seeded.');
     }

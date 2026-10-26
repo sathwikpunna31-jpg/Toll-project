@@ -216,25 +216,34 @@ function AiGating() {
                 />
 
                 {previewUrl ? (
-                  <div className="relative max-w-full max-h-[300px]">
+                  <div className="relative inline-block max-w-full">
                     <img
                       src={previewUrl}
                       alt="Car Preview"
-                      className="rounded-lg object-contain max-h-[300px]"
+                      className="rounded-lg object-contain max-h-[320px] block mx-auto"
                     />
                     
                     {/* Bounding box display layer */}
-                    {aiResult && aiResult.bbox && (
+                    {aiResult && (aiResult.bbox_normalized || aiResult.bbox) && (
                       <div
-                        className="absolute border-2 border-red-500 bg-red-500/10 animate-pulse flex items-start"
-                        style={{
-                          left: `${(aiResult.bbox[0] / 640) * 100}%`, // Mock bounding box ratio mapping
-                          top: `${(aiResult.bbox[1] / 480) * 100}%`,
-                          width: `${((aiResult.bbox[2] - aiResult.bbox[0]) / 640) * 100}%`,
-                          height: `${((aiResult.bbox[3] - aiResult.bbox[1]) / 480) * 100}%`,
-                        }}
+                        className="absolute border-2 border-emerald-400 bg-emerald-500/20 shadow-[0_0_15px_rgba(52,211,153,0.4)] rounded flex items-start transition-all"
+                        style={
+                          aiResult.bbox_normalized
+                            ? {
+                                left: `${aiResult.bbox_normalized[0] * 100}%`,
+                                top: `${aiResult.bbox_normalized[1] * 100}%`,
+                                width: `${Math.max(2, (aiResult.bbox_normalized[2] - aiResult.bbox_normalized[0]) * 100)}%`,
+                                height: `${Math.max(2, (aiResult.bbox_normalized[3] - aiResult.bbox_normalized[1]) * 100)}%`,
+                              }
+                            : {
+                                left: `${(aiResult.bbox[0] / 640) * 100}%`,
+                                top: `${(aiResult.bbox[1] / 480) * 100}%`,
+                                width: `${((aiResult.bbox[2] - aiResult.bbox[0]) / 640) * 100}%`,
+                                height: `${((aiResult.bbox[3] - aiResult.bbox[1]) / 480) * 100}%`,
+                              }
+                        }
                       >
-                        <span className="bg-red-500 text-white font-mono text-[9px] px-1 py-0.5 rounded-br uppercase leading-none font-bold">
+                        <span className="bg-emerald-500 text-slate-950 font-mono text-[9px] px-1.5 py-0.5 rounded-br uppercase leading-none font-extrabold tracking-wider">
                           PLATE ({aiResult.detection.confidence.toFixed(0)}%)
                         </span>
                       </div>

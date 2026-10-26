@@ -31,17 +31,31 @@ const processDetection = async (req, res) => {
       },
     });
 
-    const { detected_plate, plate_confidence, bbox, visual_vehicle_class } = aiResponse.data;
-    const cleanPlate = detected_plate.toUpperCase();
+    const {
+      detected_plate,
+      plate_confidence,
+      bbox,
+      bbox_normalized,
+      visual_vehicle_class,
+    } = aiResponse.data;
 
-    // 2. Query vehicle in MongoDB
-    const vehicle = await Vehicle.findOne({ vehicleNumber: cleanPlate }).populate('owner', 'name email walletBalance');
+    const cleanPlate = (detected_plate || '').toUpperCase().trim();
+    const cleanPlateNoSpace = cleanPlate.replace(/[^A-Z0-9]/gi, '');
+
+    // 2. Query vehicle in MongoDB with flexible space-agnostic matching
+    const vehicle = await Vehicle.findOne({
+      $or: [
+        { vehicleNumber: cleanPlate },
+        { vehicleNumber: cleanPlateNoSpace },
+        { vehicleNumber: { $regex: new RegExp(`^${cleanPlateNoSpace}$`, 'i') } },
+      ],
+    }).populate('owner', 'name email walletBalance');
 
     let status = 'Allowed';
     let reason = '';
     let isFraud = false;
 
-    // Check Dual-Verification: Does the detected visual shape match the database vehicleType?
+    // Check Dual-Verification: Does detected visual shape match database vehicleType?
     const normalizeType = (type) => {
       if (!type) return 'Car';
       const t = type.toLowerCase();
@@ -53,7 +67,7 @@ const processDetection = async (req, res) => {
 
     if (!vehicle) {
       status = 'Blocked';
-      reason = 'Unregistered Vehicle number plate';
+      reason = `Unregistered Vehicle: Plate ${cleanPlate} not found in database.`;
     } else if (vehicle.status === 'Suspended') {
       status = 'Blocked';
       reason = 'Vehicle registry status is Suspended';
@@ -74,7 +88,7 @@ const processDetection = async (req, res) => {
     const detection = await Detection.create({
       imagePath,
       detectedPlate: cleanPlate,
-      confidence: plate_confidence * 100, // percentage representation
+      confidence: (plate_confidence || 0.85) * 100, // percentage representation
       vehicle: vehicle ? vehicle._id : null,
       status,
       reason,
@@ -98,6 +112,7 @@ const processDetection = async (req, res) => {
           }
         : null,
       bbox,
+      bbox_normalized: bbox_normalized || null,
     });
   } catch (error) {
     console.error('AI pipeline error:', error.message);
