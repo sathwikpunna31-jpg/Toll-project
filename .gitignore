@@ -25,3 +25,10 @@ backend/uploads/*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Presentation and Document files
+*.pptx
+*.ppt
+*.docx
+*.doc
+*.pdf
