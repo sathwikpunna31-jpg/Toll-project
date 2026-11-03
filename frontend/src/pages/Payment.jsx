@@ -228,7 +228,7 @@ function Payment() {
                   </div>
                   <div className="flex justify-between border-t border-slate-800/80 pt-2 mt-2 font-bold text-slate-100">
                     <span className="text-slate-400">Charged Amount:</span>
-                    <span className="text-emerald-400">${receipt.amount.toFixed(2)}</span>
+                    <span className="text-emerald-400">₹{receipt.amount.toFixed(2)}</span>
                   </div>
                 </div>
               </div>

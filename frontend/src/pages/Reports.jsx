@@ -64,7 +64,7 @@ function Reports() {
       'Vehicle Number',
       'Toll Plaza',
       'Method',
-      'Amount',
+      'Amount (INR)',
       'Status',
     ];
 
@@ -169,7 +169,7 @@ function Reports() {
                 {isAdmin ? 'Total Revenue generated' : 'Total payments cleared'}
               </span>
               <h3 className="text-3xl font-extrabold text-slate-200 mt-1">
-                ${totalRevenue.toFixed(2)}
+                ₹{totalRevenue.toFixed(2)}
               </h3>
             </div>
             <div className="bg-slate-900 border border-slate-805/85 rounded-xl p-5">
@@ -201,7 +201,7 @@ function Reports() {
                       <th className="py-2">Plaza</th>
                       <th className="py-2">Method</th>
                       <th className="py-2">Status</th>
-                      <th className="py-2 text-right">Amount</th>
+                      <th className="py-2 text-right">Amount (₹)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/50 text-slate-300">
@@ -217,7 +217,7 @@ function Reports() {
                             {t.status}
                           </span>
                         </td>
-                        <td className="py-2.5 text-right font-extrabold">${t.amount.toFixed(2)}</td>
+                        <td className="py-2.5 text-right font-extrabold">₹{t.amount.toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>

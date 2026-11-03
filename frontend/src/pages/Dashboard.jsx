@@ -155,7 +155,7 @@ function Dashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-slate-900 border border-slate-805/85 rounded-xl p-5">
               <span className="text-xs uppercase font-bold text-slate-500">Total System Revenue</span>
-              <h3 className="text-3xl font-extrabold text-slate-200 mt-1">${stats.totalRevenue.toFixed(2)}</h3>
+              <h3 className="text-3xl font-extrabold text-slate-200 mt-1">₹{stats.totalRevenue.toFixed(2)}</h3>
             </div>
             <div className="bg-slate-900 border border-slate-805/85 rounded-xl p-5">
               <span className="text-xs uppercase font-bold text-slate-500">Active Fleet Records</span>
@@ -255,11 +255,11 @@ function Dashboard() {
             </div>
             <div className="bg-slate-900 border border-slate-850 p-5 rounded-xl">
               <span className="text-slate-500 uppercase text-xs font-bold">Total Payments Cleared</span>
-              <h3 className="text-3xl font-extrabold text-slate-200 mt-1">${stats.totalPayments.toFixed(2)}</h3>
+              <h3 className="text-3xl font-extrabold text-slate-200 mt-1">₹{stats.totalPayments.toFixed(2)}</h3>
             </div>
             <div className="bg-slate-900 border border-slate-850 p-5 rounded-xl">
               <span className="text-slate-500 uppercase text-xs font-bold">Digital Account Wallet</span>
-              <h3 className="text-3xl font-extrabold text-emerald-400 mt-1">${user?.walletBalance?.toFixed(2)}</h3>
+              <h3 className="text-3xl font-extrabold text-emerald-400 mt-1">₹{user?.walletBalance?.toFixed(2)}</h3>
             </div>
           </div>
         </div>
@@ -285,7 +285,7 @@ function Dashboard() {
                     <p className="text-slate-500 mt-0.5">{t.tollPlazaName}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-extrabold text-slate-200">${t.amount.toFixed(2)}</p>
+                    <p className="font-extrabold text-slate-200">₹{t.amount.toFixed(2)}</p>
                     <p className={t.status === 'Success' ? 'text-emerald-400 mt-0.5 font-semibold' : 'text-rose-400 mt-0.5 font-semibold'}>
                       {t.status}
                     </p>

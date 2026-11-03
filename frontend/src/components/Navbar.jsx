@@ -26,7 +26,7 @@ function Navbar() {
           <Wallet className="w-4 h-4 text-sky-400" />
           <div className="text-xs text-left">
             <p className="text-slate-500 text-[10px] leading-none font-semibold uppercase">Wallet</p>
-            <p className="font-bold text-slate-200">${user?.walletBalance?.toFixed(2) || '0.00'}</p>
+            <p className="font-bold text-slate-200">₹{user?.walletBalance?.toFixed(2) || '0.00'}</p>
           </div>
         </div>
 

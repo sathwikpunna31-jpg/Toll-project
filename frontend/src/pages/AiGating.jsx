@@ -364,7 +364,7 @@ function AiGating() {
                       </div>
                       <div className="flex justify-between border-t border-slate-850/65 pt-2.5 mt-2.5">
                         <span className="text-slate-500">Linked Wallet:</span>
-                        <span className="text-emerald-400 font-bold">${aiResult.vehicleDetails.walletBalance?.toFixed(2)}</span>
+                        <span className="text-emerald-400 font-bold">₹{aiResult.vehicleDetails.walletBalance?.toFixed(2)}</span>
                       </div>
                     </div>
 

@@ -122,7 +122,7 @@ function Transactions() {
                   <th className="px-6 py-4">Plaza Location</th>
                   <th className="px-6 py-4">Billing Method</th>
                   <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Amount</th>
+                  <th className="px-6 py-4 text-right">Amount (₹)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/80 text-sm text-slate-300">
@@ -160,7 +160,7 @@ function Transactions() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right font-extrabold text-slate-100">
-                      ${t.amount.toFixed(2)}
+                      ₹{t.amount.toFixed(2)}
                     </td>
                   </tr>
                 ))}

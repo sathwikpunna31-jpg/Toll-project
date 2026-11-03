@@ -249,19 +249,19 @@ function Plazas() {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div className="bg-slate-950 border border-slate-850 p-3 rounded-xl text-center">
                       <p className="text-[10px] uppercase font-semibold text-slate-500">Bike</p>
-                      <p className="text-lg font-extrabold text-slate-200 mt-1">${plaza.rates?.Bike || 0}</p>
+                      <p className="text-lg font-extrabold text-slate-200 mt-1">₹{plaza.rates?.Bike || 0}</p>
                     </div>
                     <div className="bg-slate-950 border border-slate-850 p-3 rounded-xl text-center">
                       <p className="text-[10px] uppercase font-semibold text-slate-500">Car</p>
-                      <p className="text-lg font-extrabold text-slate-200 mt-1">${plaza.rates?.Car || 0}</p>
+                      <p className="text-lg font-extrabold text-slate-200 mt-1">₹{plaza.rates?.Car || 0}</p>
                     </div>
                     <div className="bg-slate-950 border border-slate-850 p-3 rounded-xl text-center">
                       <p className="text-[10px] uppercase font-semibold text-slate-500">Bus</p>
-                      <p className="text-lg font-extrabold text-slate-200 mt-1">${plaza.rates?.Bus || 0}</p>
+                      <p className="text-lg font-extrabold text-slate-200 mt-1">₹{plaza.rates?.Bus || 0}</p>
                     </div>
                     <div className="bg-slate-950 border border-slate-850 p-3 rounded-xl text-center">
                       <p className="text-[10px] uppercase font-semibold text-slate-500">Truck</p>
-                      <p className="text-lg font-extrabold text-slate-200 mt-1">${plaza.rates?.Truck || 0}</p>
+                      <p className="text-lg font-extrabold text-slate-200 mt-1">₹{plaza.rates?.Truck || 0}</p>
                     </div>
                   </div>
                   <div className="mt-3 text-[10px] text-emerald-400 font-semibold bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-2 text-center uppercase tracking-wide">
@@ -320,11 +320,11 @@ function Plazas() {
               {/* Rates editing segment */}
               <div className="border-t border-slate-800 pt-4 mt-2">
                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-300 mb-3">
-                  Fare Configuration ($)
+                  Fare Configuration (₹)
                 </label>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1 font-semibold">Bike Rate ($)</label>
+                    <label className="block text-xs text-slate-400 mb-1 font-semibold">Bike Rate (₹)</label>
                     <input
                       type="number"
                       required
@@ -335,7 +335,7 @@ function Plazas() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1 font-semibold">Car Rate ($)</label>
+                    <label className="block text-xs text-slate-400 mb-1 font-semibold">Car Rate (₹)</label>
                     <input
                       type="number"
                       required
@@ -346,7 +346,7 @@ function Plazas() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1 font-semibold">Bus Rate ($)</label>
+                    <label className="block text-xs text-slate-400 mb-1 font-semibold">Bus Rate (₹)</label>
                     <input
                       type="number"
                       required
@@ -357,7 +357,7 @@ function Plazas() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1 font-semibold">Truck Rate ($)</label>
+                    <label className="block text-xs text-slate-400 mb-1 font-semibold">Truck Rate (₹)</label>
                     <input
                       type="number"
                       required

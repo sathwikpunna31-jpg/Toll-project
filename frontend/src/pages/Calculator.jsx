@@ -156,7 +156,7 @@ function CalculatorPage() {
                     Calculated Toll Amount
                   </span>
                   <h3 className="text-4xl font-extrabold bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent mt-1">
-                    ${calculationResult.amount.toFixed(2)}
+                    ₹{calculationResult.amount.toFixed(2)}
                   </h3>
                 </div>
 
