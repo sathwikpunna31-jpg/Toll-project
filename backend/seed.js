@@ -99,6 +99,16 @@ const seedData = async () => {
         status: 'Active',
       },
       {
+        vehicleNumber: 'TN23BS1609',
+        owner: customer._id,
+        ownerName: 'John Doe Customer',
+        vehicleType: 'Bike',
+        vehicleModel: 'Bajaj Pulsar 220F',
+        registrationNumber: 'RC-TN23-1609',
+        fastagId: 'FT-9911223344',
+        status: 'Active',
+      },
+      {
         vehicleNumber: 'TN19AK4401',
         owner: customer._id,
         ownerName: 'John Doe Customer',
